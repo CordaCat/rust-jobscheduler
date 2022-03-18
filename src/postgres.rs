@@ -7,14 +7,16 @@ use sqlx::{self, types::Json};
 use ulid::Ulid;
 use uuid::Uuid;
 
+// We create a PostgresQueue type, it defines the actual database and the maximum tries
 #[derive(Debug, Clone)]
 pub struct PostgresQueue {
     db: DB,
     max_attempts: u32,
 }
+const MAX_FAILED_ATTEMPTS: i32 = 3;
 
-const MAX_FAILED_ATTEMPTS: i32 = 3; // low, as most jobs also use retries internally
-
+// We create a PostgresJob type, and derive features that allow us to copy, debug and convert from a pg row type 
+//  to a PostgresJob type
 #[derive(sqlx::FromRow, Debug, Clone)]
 struct PostgresJob {
     id: Uuid,
@@ -38,8 +40,9 @@ enum PostgresJobStatus {
     Running,
     Failed,
 }
+
 // This implementation allows us to convert from a PostgresJob type
-// to a Job type.
+// to a Job type (The Job type is defined in queue.rs).
 impl From<PostgresJob> for Job {
     fn from(item: PostgresJob) -> Self {
         Job {
@@ -49,6 +52,7 @@ impl From<PostgresJob> for Job {
     }
 }
 
+// We create a new function to initialize a new instance of the PostgresQueue type
 impl PostgresQueue {
     pub fn new(db: DB) -> PostgresQueue {
         let queue = PostgresQueue {
@@ -60,6 +64,8 @@ impl PostgresQueue {
     }
 }
 
+// Here we implement the Queue trait from queue.rs...This allows us to have a concrete implementations
+// of Queue (push, pull, delete, cancel and clear) for the PostgresQueue type
 #[async_trait::async_trait]
 impl Queue for PostgresQueue {
     async fn push(
@@ -89,7 +95,7 @@ impl Queue for PostgresQueue {
             .await?;
         Ok(())
     }
-
+    
     async fn delete_job(&self, job_id: Uuid) -> Result<(), crate::Error> {
         let query = "DELETE FROM queue WHERE id = $1";
 
