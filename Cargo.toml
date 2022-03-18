@@ -11,6 +11,7 @@ anyhow = "1.0.56"
 async-trait = "0.1.52"
 chrono = "0.4.19"
 futures = "0.3.21"
+rocket = "0.4.10"
 serde = {version = "1.0.136", features = ["derive"]}
 sqlx = {version = "0.5.11", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json"]}
 thiserror = "1.0.30"
