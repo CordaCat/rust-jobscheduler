@@ -34,12 +34,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Ok(jobs) => println!("{:?}", jobs),
         Err(err) => {}
     };
-    // pull 10 jobs use pull impl from postgres.rs
 
-    // let pg_test = PostgresQueue::pull(&self, 1);
-
-    //  Add jobs to DB
-    // ***************** CONSIDER USING PUSH/PULL IMPLS TO ACHIEVE THE API INTEGRATION *****************
     // ================================= REST API INTEGRATION ENDS HERE EXTRACT TO DB =================================
 
     // Start Rocket Server
