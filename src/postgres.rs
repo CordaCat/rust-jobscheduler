@@ -69,6 +69,8 @@ impl PostgresQueue {
 // of Queue (push, pull, delete, cancel and clear) for the PostgresQueue type
 #[async_trait::async_trait]
 impl Queue for PostgresQueue {
+    // Add create and update functions for Rocket API
+
     async fn push(
         &self,
         job: Message,

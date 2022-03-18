@@ -1,7 +1,10 @@
 #![feature(proc_macro_hygiene, decl_macro)]
-
+#![allow(unused)] // silence unused warnings
 #[macro_use]
 extern crate rocket;
+
+use sqlx::postgres::{PgPoolOptions, PgRow};
+use sqlx::{FromRow, Row};
 mod db;
 mod error;
 mod postgres;
@@ -16,15 +19,25 @@ use rocket::routes;
 const CONCURRENCY: usize = 50;
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // Start Rocket Server
-    rocket::ignite().mount("/", routes![index]).launch();
-
     // Grab the DB url from env and print a success message in the terminal
     let database_url = std::env::var("DATABASE_URL").map_err(|_| {
         Error::BadConfig("DATABASE_URL IS NOT FOUND! PLEASE SET AS AN ENV VARIABLE".to_string())
     })?;
     println!("Connected to Database, DB URL: {:?},", database_url);
+    // Start Rocket Server
+    println!("STARTING ROCKET SERVER...");
+    rocket::ignite().mount("/", routes![index]).launch();
 
+    // ================================= REST API INTEGRATION STARTS HERE =================================
+    // Create a separate pool for Rocket API to allow users to add jobs directly to the db
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await?;
+
+    // ================================= REST API INTEGRATION ENDS HERE EXTRACT TO DB =================================
+
+    // ================================= TASK SCHEDULER FUNCTIONALITY STARTS HERE ===================================
     // Use db url to connect to database and initiate migration
     let db = db::connect(&database_url).await?;
     db::migrate(&db).await?;
@@ -34,7 +47,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let queue_1 = queue.clone();
 
-    // Spawn a Tokio green thread
+    // Spawn a Tokio green thread and pass a cloned queue to it
     tokio::spawn(async move { run_worker(queue_1).await });
 
     // TEST JOB
@@ -42,13 +55,13 @@ async fn main() -> Result<(), anyhow::Error> {
         item: "JOB DETAIL HERE".to_string(),
     };
 
-    // Add API logic to allow user to add jobs to the db
     // Push jobs to queue
 
     let _ = queue.push(job, None).await;
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     Ok(())
+    // TASK SCHEDULER FUNCTIONALITY ENDS HERE
 }
 
 async fn run_worker(queue: Arc<dyn Queue>) {
