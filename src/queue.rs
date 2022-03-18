@@ -24,12 +24,13 @@ pub trait Queue: Send + Sync + Debug {
 }
 
 // We define a struct that will represent instances of a job . We also derive
-// additional features that allow us to debug, copy and serialize/de-serialize 
+// additional features that allow us to debug, copy and serialize/de-serialize
 // between data types.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Job {
     pub id: Uuid,
     pub message: Message,
+    // pub repeat: i32,
 }
 
 // We define a message data type to hold some kind of job related message.
@@ -37,9 +38,6 @@ pub struct Job {
 // we use a simple string.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Message {
-    Detail {
-        item: String
-    },
-// We can add additional job functionality here
+    Detail { item: String },
+    // We can add additional job functionality here
 }
-

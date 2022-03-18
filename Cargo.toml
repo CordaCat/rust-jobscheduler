@@ -16,4 +16,4 @@ sqlx = {version = "0.5.11", features = ["runtime-tokio-rustls", "postgres", "chr
 thiserror = "1.0.30"
 tokio = {version = "1", features = ["full"]}
 ulid = {version = "0.5.0", features = ["uuid"]}
-uuid = "0.8.2"
+uuid = {version = "0.8.2", features = ["serde", "v4"]}

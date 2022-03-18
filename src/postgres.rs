@@ -15,15 +15,15 @@ pub struct PostgresQueue {
 }
 const MAX_FAILED_ATTEMPTS: i32 = 3;
 
-// We create a PostgresJob type, and derive features that allow us to copy, debug and convert from a pg row type 
+// We create a PostgresJob type, and derive features that allow us to copy, debug and convert from a pg row type
 //  to a PostgresJob type
 #[derive(sqlx::FromRow, Debug, Clone)]
 struct PostgresJob {
     id: Uuid,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
-
     scheduled_for: chrono::DateTime<chrono::Utc>,
+    // repeat: i32,
     failed_attempts: i32,
     status: PostgresJobStatus,
     message: Json<Message>,
@@ -48,6 +48,7 @@ impl From<PostgresJob> for Job {
         Job {
             id: item.id,
             message: item.message.0,
+            // repeat,
         }
     }
 }
@@ -75,6 +76,7 @@ impl Queue for PostgresQueue {
     ) -> Result<(), crate::Error> {
         let scheduled_for = date.unwrap_or(chrono::Utc::now());
         let failed_attempts: i32 = 0;
+        // let repeat: i32 = 0;
         let message = Json(job);
         let status = PostgresJobStatus::Queued;
         let now = chrono::Utc::now();
@@ -88,6 +90,7 @@ impl Queue for PostgresQueue {
             .bind(now)
             .bind(now)
             .bind(scheduled_for)
+            // .bind(repeat)
             .bind(failed_attempts)
             .bind(status)
             .bind(message)
@@ -95,7 +98,7 @@ impl Queue for PostgresQueue {
             .await?;
         Ok(())
     }
-    
+
     async fn delete_job(&self, job_id: Uuid) -> Result<(), crate::Error> {
         let query = "DELETE FROM queue WHERE id = $1";
 
