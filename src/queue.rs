@@ -9,6 +9,8 @@ use uuid::Uuid;
 pub trait Queue: Send + Sync + Debug {
     // Add create and update traits for the Rocket API (these are only to be used from Rocket)
     //  Push a job into the queue
+    // ***************** CONSIDER USING PUSH/PULL IMPLS TO ACHIEVE THE API INTEGRATION *****************
+
     async fn push(
         &self,
         job: Message,

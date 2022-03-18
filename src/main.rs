@@ -4,7 +4,7 @@
 extern crate rocket;
 
 use sqlx::postgres::{PgPoolOptions, PgRow};
-use sqlx::{FromRow, Row};
+use sqlx::{types::Json, FromRow, Row};
 mod db;
 mod error;
 mod postgres;
@@ -27,20 +27,13 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // ================================= REST API INTEGRATION STARTS HERE =================================
     // Create a separate pool for Rocket API to allow users to add jobs directly to the db
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
-        .await?;
+    // Try and use push pull functions here
+    // Read jobs from DB
 
-    let rows = sqlx::query("SELECT * FROM queue").fetch_all(&pool).await?;
+    // let pg_test = PostgresQueue::pull(&self, 1);
 
-    let str_result = rows
-        .iter()
-        .map(|r| format!("{}", r.get::<Uuid, _>("id"),))
-        .collect::<Vec<String>>()
-        .join(", ");
-    println!("\n== select jobs with PgRows:\n{}", str_result);
-
+    //  Add jobs to DB
+    // ***************** CONSIDER USING PUSH/PULL IMPLS TO ACHIEVE THE API INTEGRATION *****************
     // ================================= REST API INTEGRATION ENDS HERE EXTRACT TO DB =================================
 
     // Start Rocket Server
@@ -58,12 +51,12 @@ async fn main() -> Result<(), anyhow::Error> {
     let queue_1 = queue.clone();
 
     // Spawn a Tokio green thread and pass a cloned queue to it
-    tokio::spawn(async move { run_worker(queue_1).await });
 
     // TEST JOB
     let job = Message::Detail {
         item: "JOB DETAIL HERE".to_string(),
     };
+    tokio::spawn(async move { run_worker(queue_1).await });
 
     // Push jobs to queue
 
