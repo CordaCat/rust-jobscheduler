@@ -9,13 +9,13 @@ mod db;
 mod error;
 mod postgres;
 mod queue;
-use std::{sync::Arc, time::Duration};
-
 pub use error::Error;
 use futures::{stream, StreamExt};
 use postgres::PostgresQueue;
 use queue::{Job, Message, Queue};
 use rocket::routes;
+use std::{sync::Arc, time::Duration};
+use uuid::Uuid;
 const CONCURRENCY: usize = 50;
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -24,9 +24,6 @@ async fn main() -> Result<(), anyhow::Error> {
         Error::BadConfig("DATABASE_URL IS NOT FOUND! PLEASE SET AS AN ENV VARIABLE".to_string())
     })?;
     println!("Connected to Database, DB URL: {:?},", database_url);
-    // Start Rocket Server
-    println!("STARTING ROCKET SERVER...");
-    rocket::ignite().mount("/", routes![index]).launch();
 
     // ================================= REST API INTEGRATION STARTS HERE =================================
     // Create a separate pool for Rocket API to allow users to add jobs directly to the db
@@ -35,9 +32,22 @@ async fn main() -> Result<(), anyhow::Error> {
         .connect(&database_url)
         .await?;
 
+    let rows = sqlx::query("SELECT * FROM queue").fetch_all(&pool).await?;
+
+    let str_result = rows
+        .iter()
+        .map(|r| format!("{}", r.get::<Uuid, _>("id"),))
+        .collect::<Vec<String>>()
+        .join(", ");
+    println!("\n== select jobs with PgRows:\n{}", str_result);
+
     // ================================= REST API INTEGRATION ENDS HERE EXTRACT TO DB =================================
 
-    // ================================= TASK SCHEDULER FUNCTIONALITY STARTS HERE ===================================
+    // Start Rocket Server
+    println!("STARTING ROCKET SERVER...");
+    rocket::ignite().mount("/", routes![index]).launch();
+
+    // ================================= TASK SCHEDULER FUNCTIONALITY STARTS HERE =================================
     // Use db url to connect to database and initiate migration
     let db = db::connect(&database_url).await?;
     db::migrate(&db).await?;
@@ -61,9 +71,10 @@ async fn main() -> Result<(), anyhow::Error> {
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     Ok(())
-    // TASK SCHEDULER FUNCTIONALITY ENDS HERE
+    // ================================= TASK SCHEDULER FUNCTIONALITY ENDS HERE =================================
 }
 
+// ================================= WORKER FUNCTION PULLS JOBS DIRECTLY FROM DB =================================
 async fn run_worker(queue: Arc<dyn Queue>) {
     loop {
         let jobs = match queue.pull(CONCURRENCY as u32).await {
@@ -108,6 +119,7 @@ async fn run_worker(queue: Arc<dyn Queue>) {
     }
 }
 
+// ================================= HANDLE JOB FUNCTION =================================
 async fn handle_job(job: Job) -> Result<(), crate::Error> {
     match job.message {
         message @ Message::Detail { .. } => {
@@ -118,8 +130,8 @@ async fn handle_job(job: Job) -> Result<(), crate::Error> {
     Ok(())
 }
 
-// ROCKET CONFIGURATION BELOW
-
+// ================================= ROCKET API ROUTES =================================
+// Add rest api functions here for CRUD
 #[get("/")]
 fn index() -> &'static str {
     "RUST JOB SCHEDULER"
