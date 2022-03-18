@@ -19,16 +19,22 @@ use uuid::Uuid;
 const CONCURRENCY: usize = 50;
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    // DATABASE SETUP
     // Grab the DB url from env and print a success message in the terminal
     let database_url = std::env::var("DATABASE_URL").map_err(|_| {
         Error::BadConfig("DATABASE_URL IS NOT FOUND! PLEASE SET AS AN ENV VARIABLE".to_string())
     })?;
     println!("Connected to Database, DB URL: {:?},", database_url);
-
+    // Use db url to connect to database and initiate migration
+    let db = db::connect(&database_url).await?;
+    db::migrate(&db).await?;
     // ================================= REST API INTEGRATION STARTS HERE =================================
-    // Create a separate pool for Rocket API to allow users to add jobs directly to the db
-    // Try and use push pull functions here
-    // Read jobs from DB
+    let rocket_queue = Arc::new(PostgresQueue::new(db.clone()));
+    let rocket_jobs = match rocket_queue.pull(1u32).await {
+        Ok(jobs) => println!("{:?}", jobs),
+        Err(err) => {}
+    };
+    // pull 10 jobs use pull impl from postgres.rs
 
     // let pg_test = PostgresQueue::pull(&self, 1);
 
@@ -41,9 +47,6 @@ async fn main() -> Result<(), anyhow::Error> {
     rocket::ignite().mount("/", routes![index]).launch();
 
     // ================================= TASK SCHEDULER FUNCTIONALITY STARTS HERE =================================
-    // Use db url to connect to database and initiate migration
-    let db = db::connect(&database_url).await?;
-    db::migrate(&db).await?;
 
     // Create a new PostgresQueue wrapped in an atomic reference counter
     let queue = Arc::new(PostgresQueue::new(db.clone()));
