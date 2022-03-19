@@ -29,24 +29,24 @@ async fn main() -> Result<(), anyhow::Error> {
     let db = db::connect(&database_url).await?;
     db::migrate(&db).await?;
     // ================================= REST API INTEGRATION STARTS HERE =================================
+    let job = Message::Detail {
+        item: "JOB DETAIL HERE".to_string(),
+    };
+    // Create a new PostgresQueue wrapped in an atomic reference counter
+    let queue = Arc::new(PostgresQueue::new(db.clone()));
+    let queue_1 = queue.clone();
+    let _ = queue.push(job, None).await;
+    // TEST
     let rocket_queue = Arc::new(PostgresQueue::new(db.clone()));
+
     let rocket_jobs = match rocket_queue.pull(1u32).await {
         Ok(jobs) => println!("{:?}", jobs),
         Err(err) => {}
     };
 
     // ================================= REST API INTEGRATION ENDS HERE EXTRACT TO DB =================================
-
-    // Start Rocket Server
-    println!("STARTING ROCKET SERVER...");
-    rocket::ignite().mount("/", routes![index]).launch();
-
+    rocket().launch();
     // ================================= TASK SCHEDULER FUNCTIONALITY STARTS HERE =================================
-
-    // Create a new PostgresQueue wrapped in an atomic reference counter
-    let queue = Arc::new(PostgresQueue::new(db.clone()));
-
-    let queue_1 = queue.clone();
 
     // Spawn a Tokio green thread and pass a cloned queue to it
 
@@ -126,4 +126,8 @@ async fn handle_job(job: Job) -> Result<(), crate::Error> {
 #[get("/")]
 fn index() -> &'static str {
     "RUST JOB SCHEDULER"
+}
+
+fn rocket() -> rocket::Rocket {
+    rocket::ignite().mount("/jobs", routes![index])
 }
