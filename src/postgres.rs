@@ -125,7 +125,7 @@ impl Queue for PostgresQueue {
 
     async fn pull(&self, number_of_jobs: u32) -> Result<Vec<Job>, crate::Error> {
         let number_of_jobs = if number_of_jobs > 100 {
-            100
+            10000
         } else {
             number_of_jobs
         };

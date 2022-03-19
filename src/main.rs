@@ -16,7 +16,7 @@ use queue::{Job, Message, Queue};
 use rocket::routes;
 use std::{sync::Arc, time::Duration};
 use uuid::Uuid;
-const CONCURRENCY: usize = 50;
+const CONCURRENCY: usize = 5000;
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     // DATABASE SETUP
@@ -27,7 +27,7 @@ async fn main() -> Result<(), anyhow::Error> {
     println!("Connected to Database, DB URL: {:?},", database_url);
     // Use db url to connect to database and initiate migration
     let db = db::connect(&database_url).await?;
-    db::migrate(&db).await?;
+    // db::migrate(&db).await?;
 
     // TEST JOB
     let job1 = Message::Detail {
@@ -44,12 +44,12 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     let queue = Arc::new(PostgresQueue::new(db.clone()));
-
-    queue.push(job1, None).await;
-    queue.push(job2, None).await;
-    queue.push(job3, None).await;
-    queue.push(job4, None).await;
-
+    // for i in 1..100000 {
+    //     queue.push(job1.clone(), None).await;
+    //     queue.push(job2.clone(), None).await;
+    //     queue.push(job3.clone(), None).await;
+    //     queue.push(job4.clone(), None).await;
+    // }
     tokio::spawn(async move { run_worker(queue).await });
     tokio::time::sleep(Duration::from_secs(2)).await;
 
@@ -68,12 +68,15 @@ async fn run_worker(queue: Arc<dyn Queue>) {
         };
 
         let number_of_jobs = jobs.len();
-        if number_of_jobs > 0 {
-            println!("Fetched {} jobs", number_of_jobs);
-        } else {
-            println!("NO MORE JOBS!");
-        }
 
+        if number_of_jobs > 0 {
+            println!("Fetched {:?} jobs", number_of_jobs);
+        } else {
+            println!("NO MORE JOBS! WAITING FOR MORE JOBS....");
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        }
+        println!("STREAM STARTS HERE");
+        // Worker starts processing jobs here
         stream::iter(jobs)
             .for_each_concurrent(CONCURRENCY, |job| async {
                 let job_id = job.id;
@@ -93,9 +96,10 @@ async fn run_worker(queue: Arc<dyn Queue>) {
                 }
             })
             .await;
+        println!("STREAM ENDS HERE");
 
         // sleep not to overload our database
-        tokio::time::sleep(Duration::from_millis(125)).await;
+        tokio::time::sleep(Duration::from_millis(5000)).await;
     }
 }
 
