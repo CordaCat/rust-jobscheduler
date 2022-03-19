@@ -27,31 +27,12 @@ async fn main() -> Result<(), anyhow::Error> {
     println!("Connected to Database, DB URL: {:?},", database_url);
     // Use db url to connect to database and initiate migration
     let db = db::connect(&database_url).await?;
-    // db::migrate(&db).await?;
+    db::migrate(&db).await?;
+    rocket().launch();
 
-    // TEST JOB
-    let job1 = Message::Detail {
-        item: "JOB 1 DETAILs HERE".to_string(),
-    };
-    let job2 = Message::Detail {
-        item: "JOB 2 DETAILs HERE".to_string(),
-    };
-    let job3 = Message::Detail {
-        item: "JOB 3 DETAILs HERE".to_string(),
-    };
-    let job4 = Message::Detail {
-        item: "JOB 4 DETAILs HERE".to_string(),
-    };
-
-    let queue = Arc::new(PostgresQueue::new(db.clone()));
-    // for i in 1..100000 {
-    //     queue.push(job1.clone(), None).await;
-    //     queue.push(job2.clone(), None).await;
-    //     queue.push(job3.clone(), None).await;
-    //     queue.push(job4.clone(), None).await;
-    // }
-    tokio::spawn(async move { run_worker(queue).await });
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // let queue = Arc::new(PostgresQueue::new(db.clone()));
+    // tokio::spawn(async move { run_worker(queue).await });
+    // tokio::time::sleep(Duration::from_secs(2)).await;
 
     Ok(())
 }
@@ -75,7 +56,8 @@ async fn run_worker(queue: Arc<dyn Queue>) {
             println!("NO MORE JOBS! WAITING FOR MORE JOBS....");
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
-        println!("STREAM STARTS HERE");
+
+        println!("WORKER STARTING...");
         // Worker starts processing jobs here
         stream::iter(jobs)
             .for_each_concurrent(CONCURRENCY, |job| async {
@@ -112,4 +94,13 @@ async fn handle_job(job: Job) -> Result<(), crate::Error> {
     };
 
     Ok(())
+}
+
+#[get("/")]
+fn get_jobs() -> String {
+    String::from("Jobs")
+}
+
+fn rocket() -> rocket::Rocket {
+    rocket::ignite().mount("/jobs", routes![get_jobs])
 }
