@@ -3,19 +3,15 @@
 #[macro_use]
 extern crate rocket;
 
-use sqlx::postgres::{PgPoolOptions, PgRow};
-use sqlx::{types::Json, FromRow, Row};
 mod db;
 mod error;
 mod postgres;
 mod queue;
 pub use error::Error;
 use futures::{stream, StreamExt};
-use postgres::PostgresQueue;
 use queue::{Job, Message, Queue};
 use rocket::routes;
 use std::{sync::Arc, time::Duration};
-use uuid::Uuid;
 const CONCURRENCY: usize = 5000;
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -85,7 +81,6 @@ async fn run_worker(queue: Arc<dyn Queue>) {
     }
 }
 
-// ================================= HANDLE JOB FUNCTION =================================
 async fn handle_job(job: Job) -> Result<(), crate::Error> {
     match job.message {
         message @ Message::Detail { .. } => {
