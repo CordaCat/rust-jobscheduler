@@ -28,44 +28,34 @@ async fn main() -> Result<(), anyhow::Error> {
     // Use db url to connect to database and initiate migration
     let db = db::connect(&database_url).await?;
     db::migrate(&db).await?;
-    // ================================= REST API INTEGRATION STARTS HERE =================================
-    let job = Message::Detail {
-        item: "JOB DETAIL HERE".to_string(),
-    };
-    // Create a new PostgresQueue wrapped in an atomic reference counter
-    let queue = Arc::new(PostgresQueue::new(db.clone()));
-    let queue_1 = queue.clone();
-    let _ = queue.push(job, None).await;
-    // TEST
-    let rocket_queue = Arc::new(PostgresQueue::new(db.clone()));
-
-    let rocket_jobs = match rocket_queue.pull(1u32).await {
-        Ok(jobs) => println!("{:?}", jobs),
-        Err(err) => {}
-    };
-
-    // ================================= REST API INTEGRATION ENDS HERE EXTRACT TO DB =================================
-    rocket().launch();
-    // ================================= TASK SCHEDULER FUNCTIONALITY STARTS HERE =================================
-
-    // Spawn a Tokio green thread and pass a cloned queue to it
 
     // TEST JOB
-    let job = Message::Detail {
-        item: "JOB DETAIL HERE".to_string(),
+    let job1 = Message::Detail {
+        item: "JOB 1 DETAILs HERE".to_string(),
     };
-    tokio::spawn(async move { run_worker(queue_1).await });
+    let job2 = Message::Detail {
+        item: "JOB 2 DETAILs HERE".to_string(),
+    };
+    let job3 = Message::Detail {
+        item: "JOB 3 DETAILs HERE".to_string(),
+    };
+    let job4 = Message::Detail {
+        item: "JOB 4 DETAILs HERE".to_string(),
+    };
 
-    // Push jobs to queue
+    let queue = Arc::new(PostgresQueue::new(db.clone()));
 
-    let _ = queue.push(job, None).await;
+    queue.push(job1, None).await;
+    queue.push(job2, None).await;
+    queue.push(job3, None).await;
+    queue.push(job4, None).await;
+
+    tokio::spawn(async move { run_worker(queue).await });
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     Ok(())
-    // ================================= TASK SCHEDULER FUNCTIONALITY ENDS HERE =================================
 }
 
-// ================================= WORKER FUNCTION PULLS JOBS DIRECTLY FROM DB =================================
 async fn run_worker(queue: Arc<dyn Queue>) {
     loop {
         let jobs = match queue.pull(CONCURRENCY as u32).await {
@@ -80,14 +70,13 @@ async fn run_worker(queue: Arc<dyn Queue>) {
         let number_of_jobs = jobs.len();
         if number_of_jobs > 0 {
             println!("Fetched {} jobs", number_of_jobs);
+        } else {
+            println!("NO MORE JOBS!");
         }
 
         stream::iter(jobs)
             .for_each_concurrent(CONCURRENCY, |job| async {
                 let job_id = job.id;
-                // add repeat interval logic in match need to add a repeat time (duration from)
-                // see: https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html
-                // if datetime is not now then skip
                 let res = match handle_job(job).await {
                     Ok(_) => queue.delete_job(job_id).await,
                     Err(err) => {
@@ -119,15 +108,4 @@ async fn handle_job(job: Job) -> Result<(), crate::Error> {
     };
 
     Ok(())
-}
-
-// ================================= ROCKET API ROUTES =================================
-// Add rest api functions here for CRUD
-#[get("/")]
-fn index() -> &'static str {
-    "RUST JOB SCHEDULER"
-}
-
-fn rocket() -> rocket::Rocket {
-    rocket::ignite().mount("/jobs", routes![index])
 }
